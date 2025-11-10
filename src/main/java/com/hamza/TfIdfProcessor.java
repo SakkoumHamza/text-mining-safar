@@ -1,4 +1,3 @@
-// Assurez-vous que ce package correspond à votre projet
 package com.hamza;
 
 import com.hamza.nlp.TfIdfUtils;
@@ -221,5 +220,19 @@ public class TfIdfProcessor {
 
         System.out.println("\n--- APERÇU DE LA MATRICE TF-IDF (JSON) ---");
         System.out.println(jsonOutput);
+    }
+
+    // =================================================================
+    // --- PUBLIC STATIC METHODS FOR EXTERNAL ACCESS ---
+    // =================================================================
+
+    /**
+     * Version publique de buildOccurrenceMap pour usage externe.
+     */
+    public static Map<String, Map<String, Long>> buildOccurrenceMapStatic(
+            Map<String, String> documents,
+            IStemmer stemmer,
+            Set<String> stopWords) {
+        return buildOccurrenceMap(documents, stemmer, stopWords);
     }
 }
