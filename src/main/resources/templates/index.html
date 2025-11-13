@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بحث الوثائق - TF-IDF</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="/webjars/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome for icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            direction: rtl;
+            text-align: right;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .navbar {
+            background: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+        }
+        
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border: none;
+            border-radius: 25px;
+            padding: 10px 30px;
+        }
+        
+        .result-card {
+            transition: transform 0.2s ease;
+            margin-bottom: 15px;
+        }
+        
+        .result-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .search-form {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+        
+        .stats-badge {
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+            border-radius: 20px;
+            padding: 5px 15px;
+        }
+        
+        .score-badge {
+            border-radius: 15px;
+        }
+        
+        .hero-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 30px;
+            text-align: center;
+            color: white;
+        }
+        
+        .example-queries {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="/">
+                <i class="fas fa-search me-2"></i>
+                محرك البحث في الوثائق
+            </a>
+            
+            <div class="navbar-nav me-auto">
+                <a class="nav-link" href="/">الرئيسية</a>
+            </div>
+            
+            <!-- Statistics in navbar -->
+            <div th:if="${statistics}" class="d-flex align-items-center">
+                <span class="stats-badge me-2">
+                    <i class="fas fa-file-alt me-1"></i>
+                    <span th:text="${statistics.totalDocuments}">0</span> وثائق
+                </span>
+                <span class="stats-badge">
+                    <i class="fas fa-tags me-1"></i>
+                    <span th:text="${statistics.totalUniqueTerms}">0</span> مصطلح
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Hero Section -->
+        <div class="hero-section">
+            <h1 class="display-4 mb-3">
+                <i class="fas fa-search me-3"></i>
+                محرك البحث الذكي في الوثائق
+            </h1>
+            <p class="lead mb-0">
+                ابحث في مجموعة الوثائق باستخدام تقنية TF-IDF للحصول على أفضل النتائج بسرعة ودقة.
+            </p>
+        </div>
+
+        <!-- Search Form -->
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <div class="card search-form">
+                    <form th:action="@{/search}" method="post" th:object="${searchRequest}">
+                        
+                        <!-- Main Search Input -->
+                        <div class="mb-4">
+                            <label for="query" class="form-label fs-5 fw-bold">
+                                <i class="fas fa-keyboard me-2"></i>
+                                أدخل استعلامك
+                            </label>
+                            <input type="text" 
+                                   class="form-control form-control-lg" 
+                                   id="query"
+                                   th:field="*{query}"
+                                   placeholder="مثال: بغداد عاصمة الخلافة العباسية"
+                                   autocomplete="off">
+                            <div th:if="${#fields.hasErrors('query')}" class="text-danger mt-2">
+                                <small th:errors="*{query}"></small>
+                            </div>
+                        </div>
+
+                        <!-- Advanced Options (Collapsible) -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <button class="btn btn-outline-secondary btn-sm"
+                                        type="button"
+                                        data-bs-toggle="collapse"
+                                        data-bs-target="#advancedOptions">
+                                    <i class="fas fa-cog me-1"></i>
+                                    خيارات متقدمة
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="collapse mt-3" id="advancedOptions">
+                            <div class="card card-body bg-light">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label for="threshold" class="form-label">حد التشابه</label>
+                                        <input type="number"
+                                               step="0.001"
+                                               min="0.001"
+                                               max="1.0"
+                                               class="form-control"
+                                               id="threshold"
+                                               th:field="*{threshold}">
+                                        <small class="text-muted">القيمة الافتراضية: 0.01</small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="maxResults" class="form-label">عدد النتائج المطلوبة</label>
+                                        <select class="form-control" id="maxResults" th:field="*{maxResults}">
+                                            <option value="3">3 نتائج</option>
+                                            <option value="5" selected>5 نتائج</option>
+                                            <option value="10">10 نتائج</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Search Button -->
+                        <div class="text-center mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg px-5">
+                                <i class="fas fa-search me-2"></i>
+                                ابحث في الوثائق
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search Results -->
+        <div th:if="${searchResponse != null}" class="row justify-content-center mt-4">
+        <div class="col-lg-10">
+                
+                <!-- Search Info -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="card-title mb-1">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    نتائج البحث عن: "<span th:text="${searchResponse.query}" class="text-primary"></span>"
+                                </h5>
+                                <small class="text-muted">
+                                    تم العثور على <strong th:text="${searchResponse.totalResults}">0</strong> نتيجة
+                                    في <strong th:text="${#numbers.formatDecimal(searchResponse.executionTime, 1, 3)}">0.000</strong> ثانية
+                                </small>
+                            </div>
+                            <div th:if="${searchResponse.success}" class="badge bg-success fs-6">
+                                <i class="fas fa-check me-1"></i>نجح البحث
+                            </div>
+                            <div th:unless="${searchResponse.success}" class="badge bg-danger fs-6">
+                                <i class="fas fa-times me-1"></i>فشل البحث
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <div th:if="${!searchResponse.success}" class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <span th:text="${searchResponse.message}">خطأ في البحث</span>
+                </div>
+
+
+            <!-- Results -->
+                <div th:if="${searchResponse.success and searchResponse.totalResults > 0}">
+                    <div th:each="result, iterStat : ${searchResponse.results}" class="card result-card">
+                        <div class="card-body">
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    <h5 class="card-title mb-2">
+                                        <i class="fas fa-file-text me-2 text-primary"></i>
+                                        <span th:text="${result.documentName}">Document Name</span>
+                                    </h5>
+                                    <p class="card-text mb-2">
+                                        <strong>المصطلحات المطابقة:</strong>
+                                        <span th:each="term, termStat : ${result.matchingTerms}">
+                                            <span class="badge bg-secondary me-1" th:text="${term}">term</span>
+                                        </span>
+                                    </p>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <div class="mb-2">
+                                        <span class="badge bg-primary score-badge p-2">
+                                            <i class="fas fa-percentage me-1"></i>
+                                            <span th:text="${result.scorePercentage}">0%</span>
+                                        </span>
+                                    </div>
+                                    <small class="text-muted">
+                                        النتيجة: <span th:text="${result.formattedScore}">0.0000</span>
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- No Results -->
+                <div th:if="${searchResponse.success and searchResponse.totalResults == 0}" class="card">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                        <h4>لم يتم العثور على نتائج</h4>
+                        <p class="text-muted">جرب استخدام مصطلحات مختلفة أو أكثر عمومية</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Example Queries -->
+        <div class="row justify-content-center mt-4" th:if="${searchResponse == null}">
+            <div class="col-lg-10">
+                <div class="example-queries">
+                    <h5 class="mb-3">
+                        <i class="fas fa-lightbulb me-2"></i>
+                        أمثلة على الاستعلامات
+                    </h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <a href="/search?q=بغداد عاصمة الخلافة" class="btn btn-outline-primary btn-sm mb-2 me-2">بغداد عاصمة الخلافة</a>
+                            <a href="/search?q=الإمبراطورية العثمانية" class="btn btn-outline-primary btn-sm mb-2 me-2">الإمبراطورية العثمانية</a>
+                            <a href="/search?q=العلوم الإسلامية" class="btn btn-outline-primary btn-sm mb-2 me-2">العلوم الإسلامية</a>
+                        </div>
+                        <div class="col-md-6">
+                            <a href="/search?q=دمشق والأمويين" class="btn btn-outline-primary btn-sm mb-2 me-2">دمشق والأمويين</a>
+                            <a href="/search?q=الأندلس والمسجد" class="btn btn-outline-primary btn-sm mb-2 me-2">الأندلس والمسجد</a>
+                            <a href="/search?q=الحروب والجيوش" class="btn btn-outline-primary btn-sm mb-2 me-2">الحروب والجيوش</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="mt-5 py-4 text-center text-white">
+        <div class="container">
+            <p class="mb-0">
+                &copy; 2025 نظام البحث في الوثائق باستخدام TF-IDF
+                <span class="mx-2">|</span>
+                <small>مدعوم بـ Spring Boot & Thymeleaf</small>
+            </p>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="/webjars/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="/webjars/jquery/3.7.0/jquery.min.js"></script>
+    
+    <script>
+        // Auto-focus on search input
+        $(document).ready(function() {
+            $('#query').focus();
+            
+            // Example query click handlers
+            $('.btn-outline-primary').on('click', function(e) {
+                e.preventDefault();
+                var query = $(this).text();
+                $('#query').val(query);
+                $('form').submit();
+            });
+        });
+    </script>
+</body>
+</html>

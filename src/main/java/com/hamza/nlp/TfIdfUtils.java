@@ -1,16 +1,15 @@
 package com.hamza.nlp;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@NoArgsConstructor
 public class TfIdfUtils {
-    /**
-     * Constructeur privé pour empêcher l'instanciation de cette classe utilitaire.
-     */
-    private TfIdfUtils() {
-    }
 
     public static Map<String, Double> computeTF(Map<String, Long> freqMap) {
         double total = freqMap.values().stream().mapToLong(Long::longValue).sum();
@@ -22,9 +21,6 @@ public class TfIdfUtils {
         return tf;
     }
 
-    /**
-     * Calcule la Fréquence Inverse de Document (IDF) pour tous les termes.
-     */
     public static Map<String, Double> computeIDF(Map<String, Map<String, Long>> allDocs) {
         Map<String, Double> idf = new LinkedHashMap<>();
         double totalDocs = allDocs.size();
@@ -38,9 +34,8 @@ public class TfIdfUtils {
         return idf;
     }
 
-    /**
-     * Calcule le score TF-IDF final pour tous les documents et tous les termes.
-     */
+    // Calcule le score TF-IDF final pour tous les documents et tous les termes.
+
     public static Map<String, Map<String, Double>> computeTfIdf(Map<String, Map<String, Double>> tfMap, Map<String, Double> idfMap) {
         Map<String, Map<String, Double>> tfidfMap = new LinkedHashMap<>();
 
@@ -63,36 +58,4 @@ public class TfIdfUtils {
         return tfidfMap;
     }
 
-    // --- MÉTHODE UTILITAIRE JSON ---
-
-    /**
-     * Convertit manuellement la carte TF-IDF en une chaîne de format JSON.
-     * (N'utilise aucune bibliothèque externe)
-     */
-    public static String convertMapToJson(Map<String, Map<String, Double>> map) {
-        StringBuilder json = new StringBuilder("{\n");
-        int docCount = 0;
-        for (Map.Entry<String, Map<String, Double>> docEntry : map.entrySet()) {
-            // Clé du document (ex: "doc1")
-            json.append("  \"").append(docEntry.getKey()).append("\": {\n");
-
-            // Carte des termes et scores
-            int termCount = 0;
-            for (Map.Entry<String, Double> termEntry : docEntry.getValue().entrySet()) {
-                json.append("    \"").append(termEntry.getKey()).append("\": ").append(String.format("%.8f", termEntry.getValue()));
-                if (++termCount < docEntry.getValue().size()) {
-                    json.append(",");
-                }
-                json.append("\n");
-            }
-
-            json.append("  }");
-            if (++docCount < map.size()) {
-                json.append(",");
-            }
-            json.append("\n");
-        }
-        json.append("}\n");
-        return json.toString();
-    }
 }

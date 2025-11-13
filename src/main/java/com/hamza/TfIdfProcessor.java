@@ -1,5 +1,7 @@
 package com.hamza;
 
+import com.hamza.config.SearchEngineConfig;
+import com.hamza.nlp.DocumentSearchUtils;
 import com.hamza.nlp.TfIdfUtils;
 import safar.basic.morphology.stemmer.factory.StemmerFactory;
 import safar.basic.morphology.stemmer.interfaces.IStemmer;
@@ -20,59 +22,34 @@ import java.util.stream.Collectors;
 
 public class TfIdfProcessor {
 
-    // --- CHEMINS DE CONFIGURATION ---
-    private static final String STOP_WORDS_PATH = "/Users/mac/Documents/Projects/TextMinig/src/main/resources/stop_words_arabic.txt";
-    private static final String OUTPUT_JSON_PATH = "/Users/mac/Documents/Projects/TextMinig/target/tfidf_results.json";
-    private static final List<String> DOCUMENT_PATHS = List.of(
-            "/Users/mac/Documents/Projects/TextMinig/src/main/resources/doc1.txt",
-            "/Users/mac/Documents/Projects/TextMinig/src/main/resources/doc2.txt",
-            "/Users/mac/Documents/Projects/TextMinig/src/main/resources/doc3.txt"
-    );
-
     public static void main(String[] args) throws IOException {
         System.out.println("🚀 Démarrage du pipeline TF-IDF modulaire...");
 
-        // --- 1. Chargement ---
         System.out.println("[ÉTAPE 1/6] Chargement des données...");
-        Set<String> stopWords = loadStopWords(STOP_WORDS_PATH);
-        Map<String, String> documents = loadDocuments(DOCUMENT_PATHS);
+        Set<String> stopWords = loadStopWords(SearchEngineConfig.getDefaultConfig().getStopWordsPath());
+        Map<String, String> documents = loadDocuments(SearchEngineConfig.getDefaultConfig().getDocumentPaths());
 
-        // --- 2. Initialisation ---
         System.out.println("\n[ÉTAPE 2/6] Initialisation du Stemmer SAFAR...");
         IStemmer stemmer = initializeStemmer();
 
-        // --- 3. Traitement & Comptage ---
         System.out.println("\n[ÉTAPE 3/6] Traitement du corpus...");
         Map<String, Map<String, Long>> occurrenceMap = buildOccurrenceMap(documents, stemmer, stopWords);
 
-        // --- 4. Calcul TF & IDF (avec aperçus) ---
         System.out.println("\n[ÉTAPE 4/6] Calcul des scores TF et IDF...");
         Map<String, Map<String, Double>> tfMap = computeTfMap(occurrenceMap);
-        // APPEL À LA CLASSE UTILS
+
         Map<String, Double> idfMap = TfIdfUtils.computeIDF(occurrenceMap);
         printTfIdfApercus(tfMap, idfMap);
 
-        // --- 5. Calcul TF-IDF Final ---
         System.out.println("\n[ÉTAPE 5/6] Calcul des scores TF-IDF finaux...");
-        // APPEL À LA CLASSE UTILS
+
         Map<String, Map<String, Double>> tfIdfMap = TfIdfUtils.computeTfIdf(tfMap, idfMap);
         System.out.println("✅ Calcul TF-IDF terminé.");
-
-        // --- 6. Sauvegarde ---
-        System.out.println("\n[ÉTAPE 6/6] Sauvegarde des résultats...");
-        // APPEL À LA CLASSE UTILS
-        saveResultsAsJson(tfIdfMap, OUTPUT_JSON_PATH);
 
         System.out.println("\n--- PIPELINE TERMINÉ ---");
     }
 
-    // =================================================================
-    // --- MODULES DU PIPELINE (Logique d'orchestration) ---
-    // =================================================================
 
-    /**
-     * ÉTAPE 1: Charge le fichier de mots vides (stop words).
-     */
     private static Set<String> loadStopWords(String path) throws IOException {
         System.out.println("  -> Chargement des mots vides depuis: " + path);
         Set<String> stopWords = Files.lines(Paths.get(path))
@@ -83,9 +60,6 @@ public class TfIdfProcessor {
         return stopWords;
     }
 
-    /**
-     * ÉTAPE 1: Charge les documents texte depuis une liste de chemins.
-     */
     private static Map<String, String> loadDocuments(List<String> filePaths) throws IOException {
         Map<String, String> documents = new LinkedHashMap<>();
         for (int i = 0; i < filePaths.size(); i++) {
@@ -97,18 +71,12 @@ public class TfIdfProcessor {
         return documents;
     }
 
-    /**
-     * ÉTAPE 2: Initialise le stemmer SAFAR.
-     */
     private static IStemmer initializeStemmer() {
         IStemmer stemmer = StemmerFactory.getLight10Implementation();
         System.out.println("  ✅ Raciniseur (Light10) initialisé !");
         return stemmer;
     }
 
-    /**
-     * ÉTAPE 3: Construit la carte de fréquence des termes (racines) pour tous les documents.
-     */
     private static Map<String, Map<String, Long>> buildOccurrenceMap(
             Map<String, String> documents,
             IStemmer stemmer,
@@ -138,9 +106,6 @@ public class TfIdfProcessor {
         return occurrenceMap;
     }
 
-    /**
-     * ÉTAPE 3 (Sous-tâche): Traite un texte brut pour en extraire une liste de racines filtrées.
-     */
     private static List<String> processText(String text, IStemmer stemmer, Set<String> stopWords) {
         System.out.println("  1. Racinisation du texte (stemming)...");
         List<WordStemmerAnalysis> analyses = stemmer.stem(text);
@@ -161,9 +126,6 @@ public class TfIdfProcessor {
         return docStems;
     }
 
-    /**
-     * ÉTAPE 3 (Sous-tâche): Définit les règles de filtrage pour une racine (stem).
-     */
     private static boolean isValidStem(String stem, Set<String> stopWords) {
         return stem != null &&           // Ne doit pas être nul
                 !stem.isBlank() &&        // Ne doit pas être vide
@@ -172,9 +134,6 @@ public class TfIdfProcessor {
                 stem.length() > 1;        // Ne doit pas être une seule lettre
     }
 
-    /**
-     * ÉTAPE 4: Calcule la carte TF pour tous les documents.
-     */
     private static Map<String, Map<String, Double>> computeTfMap(Map<String, Map<String, Long>> occurrenceMap) {
         Map<String, Map<String, Double>> tfMap = new LinkedHashMap<>();
         for (var entry : occurrenceMap.entrySet()) {
@@ -185,9 +144,6 @@ public class TfIdfProcessor {
         return tfMap;
     }
 
-    /**
-     * ÉTAPE 4: Affiche les aperçus TF et IDF dans la console.
-     */
     private static void printTfIdfApercus(Map<String, Map<String, Double>> tfMap, Map<String, Double> idfMap) {
         System.out.println("\n--- APERÇU SCORES TF ---");
         tfMap.forEach((doc, map) -> {
@@ -205,30 +161,6 @@ public class TfIdfProcessor {
         System.out.println("  ...");
     }
 
-    /**
-     * ÉTAPE 6: Convertit la carte TF-IDF finale en JSON et la sauvegarde dans un fichier.
-     */
-    private static void saveResultsAsJson(Map<String, Map<String, Double>> tfIdfMap, String outputPath) throws IOException {
-        System.out.println("  -> Génération de la chaîne JSON...");
-        // APPEL À LA CLASSE UTILS
-        String jsonOutput = TfIdfUtils.convertMapToJson(tfIdfMap);
-
-        System.out.println("  -> Écriture du fichier vers: " + outputPath);
-        Files.writeString(Paths.get(outputPath), jsonOutput, StandardCharsets.UTF_8);
-
-        System.out.println("✅ Fichier JSON sauvegardé avec succès !");
-
-        System.out.println("\n--- APERÇU DE LA MATRICE TF-IDF (JSON) ---");
-        System.out.println(jsonOutput);
-    }
-
-    // =================================================================
-    // --- PUBLIC STATIC METHODS FOR EXTERNAL ACCESS ---
-    // =================================================================
-
-    /**
-     * Version publique de buildOccurrenceMap pour usage externe.
-     */
     public static Map<String, Map<String, Long>> buildOccurrenceMapStatic(
             Map<String, String> documents,
             IStemmer stemmer,
